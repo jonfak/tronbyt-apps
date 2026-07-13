@@ -106,18 +106,19 @@ pixlet push <device-id> apps/traffic_home/traffic_home.star \
 
 **Config fields:**
 
-| field    | description                                     | default       |
-|----------|--------------------------------------------------|---------------|
-| `origin` | Starting location (address search in app config) | *(required)*  |
-| `home`   | Home location (address search in app config)     | *(required)*  |
-| `api_key`| TomTom API key                                    | *(required)*  |
+| field      | description                                       | default            |
+|------------|----------------------------------------------------|--------------------|
+| `origin`   | Starting location (address search in app config)   | *(required)*       |
+| `home`     | Home location (address search in app config)       | *(required)*       |
+| `api_key`  | TomTom API key                                      | *(required)*       |
+| `timezone` | IANA timezone name, used for the ETA clock          | `America/New_York` |
 
 **Notes / limitations:**
 
 - Route/traffic data is cached for 5 minutes (`ttl_seconds`) to stay well
   within TomTom's free-tier rate limits.
-- ETA text is colored green (no meaningful delay), yellow (5+ min of traffic
-  delay), or red (15+ min of traffic delay).
+- Display shows drive time, a status dot + delay (green/clear, yellow/+Xm,
+  red/+Xm for 15+ min delays), and the estimated arrival clock time.
 
 ## Adding a new app
 

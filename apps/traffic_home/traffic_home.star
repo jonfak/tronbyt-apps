@@ -12,6 +12,7 @@ load("http.star", "http")
 load("encoding/json.star", "json")
 load("render.star", "render")
 load("schema.star", "schema")
+load("time.star", "time")
 
 DEFAULT_LOCATION = """
 {
@@ -24,7 +25,9 @@ DEFAULT_LOCATION = """
 }
 """
 
+DEFAULT_TIMEZONE = "America/New_York"
 CACHE_TTL_SECONDS = 300
+BG_COLOR = "#111"
 
 def main(config):
     api_key = config.str("api_key", "")
@@ -47,28 +50,59 @@ def main(config):
     travel_min = route["travel_time_s"] // 60
     delay_min = route["delay_s"] // 60
 
-    color = "#3f3"
     if delay_min >= 15:
         color = "#f33"
     elif delay_min >= 5:
         color = "#fc3"
-
-    if delay_min > 0:
-        subtext = "+%d min traffic" % delay_min
     else:
-        subtext = "no delay"
+        color = "#3f3"
+
+    status = "+%dm" % delay_min if delay_min > 0 else "clear"
+
+    tz = config.str("timezone", DEFAULT_TIMEZONE)
+    eta = time.now().in_location(tz) + time.parse_duration("%ds" % route["travel_time_s"])
+    eta_str = eta.format("3:04PM").lower()
 
     return render.Root(
-        child = render.Column(
-            main_align = "center",
-            cross_align = "center",
-            expanded = True,
+        delay = 100,
+        child = render.Stack(
             children = [
-                render.Text("HOME", font = "tom-thumb", color = "#7cf"),
-                render.Box(height = 2, child = render.Box()),
-                render.Text("%d min" % travel_min, font = "6x13", color = color),
-                render.Box(height = 1, child = render.Box()),
-                render.Text(subtext, font = "tom-thumb", color = color),
+                render.Box(color = BG_COLOR),
+                render.Padding(
+                    pad = (2, 1, 2, 1),
+                    child = render.Column(
+                        expanded = True,
+                        main_align = "space_between",
+                        children = [
+                            render.Row(
+                                expanded = True,
+                                main_align = "space_between",
+                                cross_align = "center",
+                                children = [
+                                    render.Text("HOME", font = "tom-thumb", color = "#7cf"),
+                                    render.Circle(color = color, diameter = 5),
+                                ],
+                            ),
+                            render.Box(
+                                height = 20,
+                                child = render.Text(
+                                    "%dm" % travel_min,
+                                    font = "10x20",
+                                    color = color,
+                                ),
+                            ),
+                            render.Row(
+                                expanded = True,
+                                main_align = "space_between",
+                                cross_align = "center",
+                                children = [
+                                    render.Text(status, font = "tom-thumb", color = color),
+                                    render.Text(eta_str, font = "tom-thumb", color = "#888"),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
             ],
         ),
     )
@@ -137,6 +171,13 @@ def get_schema():
                 desc = "Free API key from developer.tomtom.com.",
                 icon = "key",
                 default = "",
+            ),
+            schema.Text(
+                id = "timezone",
+                name = "Timezone",
+                desc = "IANA timezone name, e.g. America/New_York",
+                icon = "clock",
+                default = DEFAULT_TIMEZONE,
             ),
         ],
     )
