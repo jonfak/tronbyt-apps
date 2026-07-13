@@ -72,6 +72,53 @@ pixlet push <device-id> apps/outlook_calendar/outlook_calendar.star \
 - Long meeting titles scroll horizontally in place; the time column and other
   rows stay fixed.
 
+### `apps/traffic_home`
+
+Shows live drive time (with current traffic delay) from a starting point to
+home, using the [TomTom Routing API](https://developer.tomtom.com).
+
+**Get your API key:**
+
+1. Sign up for a free account at https://developer.tomtom.com (no card
+   required).
+2. Create an API key from your dashboard.
+
+Treat the key like a credential — don't commit it to this repo.
+
+**Render locally:**
+
+```sh
+pixlet render apps/traffic_home/traffic_home.star \
+  origin='{"lat":"40.7128","lng":"-74.0060","description":"Work"}' \
+  home='{"lat":"40.6892","lng":"-74.0445","description":"Home"}' \
+  api_key="your-tomtom-api-key" \
+  -o preview.webp
+```
+
+**Push to your device:**
+
+```sh
+pixlet push <device-id> apps/traffic_home/traffic_home.star \
+  origin='{"lat":"40.7128","lng":"-74.0060","description":"Work"}' \
+  home='{"lat":"40.6892","lng":"-74.0445","description":"Home"}' \
+  api_key="your-tomtom-api-key"
+```
+
+**Config fields:**
+
+| field    | description                                     | default       |
+|----------|--------------------------------------------------|---------------|
+| `origin` | Starting location (address search in app config) | *(required)*  |
+| `home`   | Home location (address search in app config)     | *(required)*  |
+| `api_key`| TomTom API key                                    | *(required)*  |
+
+**Notes / limitations:**
+
+- Route/traffic data is cached for 5 minutes (`ttl_seconds`) to stay well
+  within TomTom's free-tier rate limits.
+- ETA text is colored green (no meaningful delay), yellow (5+ min of traffic
+  delay), or red (15+ min of traffic delay).
+
 ## Adding a new app
 
 Create a new folder under `apps/<name>/<name>.star` and use `pixlet render`
