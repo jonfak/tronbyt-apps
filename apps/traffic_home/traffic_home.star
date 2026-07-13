@@ -38,6 +38,15 @@ REVEAL_FRAMES = 24
 HOLD_FRAMES = 16
 FRAME_DELAY_MS = 90
 
+# The route draws inside an inset area so it never collides with the
+# corner-pinned ETA/delay/clock text.
+MAP_MARGIN_LEFT = 2
+MAP_MARGIN_RIGHT = 2
+MAP_MARGIN_TOP = 6
+MAP_MARGIN_BOTTOM = 6
+ROUTE_WIDTH = MAP_WIDTH - MAP_MARGIN_LEFT - MAP_MARGIN_RIGHT
+ROUTE_HEIGHT = MAP_HEIGHT - MAP_MARGIN_TOP - MAP_MARGIN_BOTTOM
+
 COLOR_GREEN = "#3f3"
 COLOR_YELLOW = "#fc3"
 COLOR_RED = "#f33"
@@ -95,7 +104,7 @@ def main(config):
                     expanded = True,
                     main_align = "end",
                     children = [
-                        render.Text("%dm" % travel_min, font = "tb-8", color = overall_color),
+                        render.Text("%dm" % travel_min, font = "tom-thumb", color = overall_color),
                     ],
                 ),
                 render.Row(
@@ -129,9 +138,9 @@ def build_frame(points_with_color, x_lim, y_lim, overlay, show_home_marker):
     layers = plot_layers(points_with_color, x_lim, y_lim)
 
     start_lon, start_lat, _ = points_with_color[0]
-    start_px, start_py = project(start_lon, start_lat, x_lim, y_lim, MAP_WIDTH, MAP_HEIGHT)
+    start_px, start_py = project(start_lon, start_lat, x_lim, y_lim, ROUTE_WIDTH, ROUTE_HEIGHT)
 
-    children = [render.Box(color = BG_COLOR)] + layers + [
+    route_children = layers + [
         render.Padding(
             pad = (max(0, start_px - 1), max(0, start_py - 1), 0, 0),
             child = render.Circle(color = COLOR_START, diameter = 3),
@@ -140,17 +149,24 @@ def build_frame(points_with_color, x_lim, y_lim, overlay, show_home_marker):
 
     if show_home_marker:
         end_lon, end_lat, _ = points_with_color[-1]
-        end_px, end_py = project(end_lon, end_lat, x_lim, y_lim, MAP_WIDTH, MAP_HEIGHT)
-        children.append(
+        end_px, end_py = project(end_lon, end_lat, x_lim, y_lim, ROUTE_WIDTH, ROUTE_HEIGHT)
+        route_children.append(
             render.Padding(
                 pad = (max(0, end_px - 1), max(0, end_py - 1), 0, 0),
                 child = render.Circle(color = COLOR_HOME, diameter = 3),
             ),
         )
 
-    children.append(overlay)
-
-    return render.Stack(children = children)
+    return render.Stack(
+        children = [
+            render.Box(color = BG_COLOR),
+            render.Padding(
+                pad = (MAP_MARGIN_LEFT, MAP_MARGIN_TOP, MAP_MARGIN_RIGHT, MAP_MARGIN_BOTTOM),
+                child = render.Stack(children = route_children),
+            ),
+            overlay,
+        ],
+    )
 
 def plot_layers(points_with_color, x_lim, y_lim):
     """Groups consecutive same-colored points into Plot line segments,
@@ -173,8 +189,8 @@ def plot_layers(points_with_color, x_lim, y_lim):
     elif len(current_pts) == 1:
         layers.append(render.Plot(
             data = current_pts * 2,
-            width = MAP_WIDTH,
-            height = MAP_HEIGHT,
+            width = ROUTE_WIDTH,
+            height = ROUTE_HEIGHT,
             color = current_color,
             x_lim = x_lim,
             y_lim = y_lim,
@@ -186,8 +202,8 @@ def plot_layers(points_with_color, x_lim, y_lim):
 def make_plot(pts, color, x_lim, y_lim):
     return render.Plot(
         data = pts,
-        width = MAP_WIDTH,
-        height = MAP_HEIGHT,
+        width = ROUTE_WIDTH,
+        height = ROUTE_HEIGHT,
         color = color,
         x_lim = x_lim,
         y_lim = y_lim,
@@ -217,12 +233,12 @@ def downsample(points, max_points):
     if n <= max_points:
         return points
 
-    stride = n / max_points
+    stride = float(n) / float(max_points)
     out = []
-    i = 0.0
-    while int(i) < n and len(out) < max_points - 1:
-        out.append(points[int(i)])
-        i += stride
+    for k in range(max_points - 1):
+        idx = int(k * stride)
+        if idx < n:
+            out.append(points[idx])
     out.append(points[-1])
     return out
 
