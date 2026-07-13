@@ -15,8 +15,8 @@ GOBIN=/usr/local/bin go install tidbyt.dev/pixlet@latest
 
 ## Apps
 
-No apps yet — an Outlook calendar app was attempted but dropped because the
-org's Microsoft 365 tenant locks down both public ICS calendar publishing and
+An Outlook calendar app was attempted but dropped because the org's
+Microsoft 365 tenant locks down both public ICS calendar publishing and
 external app logins (OAuth), leaving no viable way to pull calendar data.
 
 ### `apps/traffic_home`
@@ -66,6 +66,53 @@ pixlet push <device-id> apps/traffic_home/traffic_home.star \
   within TomTom's free-tier rate limits.
 - Display shows drive time, a status dot + delay (green/clear, yellow/+Xm,
   red/+Xm for 15+ min delays), and the estimated arrival clock time.
+
+### `apps/ai_usage`
+
+Shows session usage remaining for three AI accounts (Claude personal, Claude
+work, Gemini) as three colored bars, each with a percentage and reset time.
+
+There's no official API for consumer chat quotas (the claude.ai / Gemini app
+"messages remaining, resets at X:XX" indicator) — only API billing usage is
+exposed via official APIs, and that's a separate thing from the chat app's
+session limit. So the values are entered manually: check each account's
+usage indicator occasionally (claude.ai: Settings > Usage) and update this
+app's config.
+
+**Render locally:**
+
+```sh
+pixlet render apps/ai_usage/ai_usage.star \
+  claude_personal_pct="72" claude_personal_reset="15:15" \
+  claude_work_pct="40" claude_work_reset="18:00" \
+  gemini_pct="12" gemini_reset="20:30" \
+  -o preview.webp
+```
+
+**Push to your device:**
+
+```sh
+pixlet push <device-id> apps/ai_usage/ai_usage.star \
+  claude_personal_pct="72" claude_personal_reset="15:15" \
+  claude_work_pct="40" claude_work_reset="18:00" \
+  gemini_pct="12" gemini_reset="20:30"
+```
+
+**Config fields:**
+
+| field                    | description                              | default |
+|--------------------------|-------------------------------------------|---------|
+| `claude_personal_pct`    | % remaining, Claude personal account       | `100`   |
+| `claude_personal_reset`  | Reset time, e.g. `15:15`                   | `--:--` |
+| `claude_work_pct`        | % remaining, Claude work account           | `100`   |
+| `claude_work_reset`      | Reset time, e.g. `15:15`                   | `--:--` |
+| `gemini_pct`             | % remaining, Gemini account                | `100`   |
+| `gemini_reset`           | Reset time, e.g. `15:15`                   | `--:--` |
+
+**Notes / limitations:**
+
+- Values are manual — there's no automated refresh.
+- Bar color: green (>50%), yellow (21-50%), red (<=20%).
 
 ## Adding a new app
 
