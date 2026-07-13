@@ -21,8 +21,10 @@ external app logins (OAuth), leaving no viable way to pull calendar data.
 
 ### `apps/traffic_home`
 
-Shows live drive time (with current traffic delay) from a starting point to
-home, using the [TomTom Routing API](https://developer.tomtom.com).
+Animates the route from a starting point to home being "driven," colored
+green/yellow/red by live traffic along each stretch of road, using the
+[TomTom Routing API](https://developer.tomtom.com). ETA, delay, and
+estimated arrival time stay pinned in the corners.
 
 **Get your API key:**
 
@@ -64,8 +66,13 @@ pixlet push <device-id> apps/traffic_home/traffic_home.star \
 
 - Route/traffic data is cached for 5 minutes (`ttl_seconds`) to stay well
   within TomTom's free-tier rate limits.
-- Display shows drive time, a status dot + delay (green/clear, yellow/+Xm,
-  red/+Xm for 15+ min delays), and the estimated arrival clock time.
+- The route "draws" itself over ~2 seconds, then holds the full map for a
+  few seconds before looping. Each stretch of road is colored by TomTom's
+  live traffic magnitude for that segment (green/yellow/red), with a start
+  marker and a home marker. ETA, delay, and estimated arrival clock time are
+  pinned in the corners throughout.
+- The map is a rough shape at this resolution — useful for "is my route
+  mostly clear," not turn-by-turn detail.
 
 ## Adding a new app
 

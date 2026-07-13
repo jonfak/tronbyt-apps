@@ -1,7 +1,8 @@
 """
 Traffic Home
-Shows live drive time (with current traffic) from a starting point to home,
-using the TomTom Routing API.
+Animates the route from a starting point to home being "driven," colored
+green/yellow/red by live traffic, using the TomTom Routing API. ETA and
+delay are pinned in the corners.
 
 Setup:
   Get a free API key at https://developer.tomtom.com (no card required),
@@ -10,6 +11,7 @@ Setup:
 
 load("http.star", "http")
 load("encoding/json.star", "json")
+load("math.star", "math")
 load("render.star", "render")
 load("schema.star", "schema")
 load("time.star", "time")
@@ -28,6 +30,28 @@ DEFAULT_LOCATION = """
 DEFAULT_TIMEZONE = "America/New_York"
 CACHE_TTL_SECONDS = 300
 BG_COLOR = "#111"
+
+MAP_WIDTH = 64
+MAP_HEIGHT = 32
+MAX_ROUTE_POINTS = 40
+REVEAL_FRAMES = 24
+HOLD_FRAMES = 16
+FRAME_DELAY_MS = 90
+
+# The route draws inside an inset area so it never collides with the
+# corner-pinned ETA/delay/clock text.
+MAP_MARGIN_LEFT = 2
+MAP_MARGIN_RIGHT = 2
+MAP_MARGIN_TOP = 6
+MAP_MARGIN_BOTTOM = 6
+ROUTE_WIDTH = MAP_WIDTH - MAP_MARGIN_LEFT - MAP_MARGIN_RIGHT
+ROUTE_HEIGHT = MAP_HEIGHT - MAP_MARGIN_TOP - MAP_MARGIN_BOTTOM
+
+COLOR_GREEN = "#3f3"
+COLOR_YELLOW = "#fc3"
+COLOR_RED = "#f33"
+COLOR_START = "#7cf"
+COLOR_HOME = "#fff"
 
 def main(config):
     api_key = config.str("api_key", "")
@@ -51,11 +75,11 @@ def main(config):
     delay_min = route["delay_s"] // 60
 
     if delay_min >= 15:
-        color = "#f33"
+        overall_color = COLOR_RED
     elif delay_min >= 5:
-        color = "#fc3"
+        overall_color = COLOR_YELLOW
     else:
-        color = "#3f3"
+        overall_color = COLOR_GREEN
 
     status = "+%dm" % delay_min if delay_min > 0 else "clear"
 
@@ -63,49 +87,183 @@ def main(config):
     eta = time.now().in_location(tz) + time.parse_duration("%ds" % route["travel_time_s"])
     eta_str = eta.format("3:04PM").lower()
 
-    return render.Root(
-        delay = 100,
-        child = render.Stack(
+    points = downsample(route["points"], MAX_ROUTE_POINTS)
+    if len(points) < 2:
+        return error_root("Route unavailable")
+
+    points_with_color = colorize_points(points, route["sections"])
+    x_lim, y_lim = bounding_box(points)
+
+    overlay = render.Padding(
+        pad = (1, 1, 1, 1),
+        child = render.Column(
+            expanded = True,
+            main_align = "space_between",
             children = [
-                render.Box(color = BG_COLOR),
-                render.Padding(
-                    pad = (2, 1, 2, 1),
-                    child = render.Column(
-                        expanded = True,
-                        main_align = "space_between",
-                        children = [
-                            render.Row(
-                                expanded = True,
-                                main_align = "space_between",
-                                cross_align = "center",
-                                children = [
-                                    render.Text("HOME", font = "tom-thumb", color = "#7cf"),
-                                    render.Circle(color = color, diameter = 5),
-                                ],
-                            ),
-                            render.Box(
-                                height = 20,
-                                child = render.Text(
-                                    "%dm" % travel_min,
-                                    font = "10x20",
-                                    color = color,
-                                ),
-                            ),
-                            render.Row(
-                                expanded = True,
-                                main_align = "space_between",
-                                cross_align = "center",
-                                children = [
-                                    render.Text(status, font = "tom-thumb", color = color),
-                                    render.Text(eta_str, font = "tom-thumb", color = "#888"),
-                                ],
-                            ),
-                        ],
-                    ),
+                render.Row(
+                    expanded = True,
+                    main_align = "end",
+                    children = [
+                        render.Text("%dm" % travel_min, font = "tom-thumb", color = overall_color),
+                    ],
+                ),
+                render.Row(
+                    expanded = True,
+                    main_align = "space_between",
+                    children = [
+                        render.Text(status, font = "tom-thumb", color = overall_color),
+                        render.Text(eta_str, font = "tom-thumb", color = "#ccc"),
+                    ],
                 ),
             ],
         ),
     )
+
+    frames = []
+    total = len(points_with_color)
+    for f in range(1, REVEAL_FRAMES + 1):
+        cutoff = max(2, int(math.round(float(total) * float(f) / float(REVEAL_FRAMES))))
+        frames.append(build_frame(points_with_color[:cutoff], x_lim, y_lim, overlay, cutoff == total))
+
+    full_frame = build_frame(points_with_color, x_lim, y_lim, overlay, True)
+    for _ in range(HOLD_FRAMES):
+        frames.append(full_frame)
+
+    return render.Root(
+        delay = FRAME_DELAY_MS,
+        child = render.Animation(children = frames),
+    )
+
+def build_frame(points_with_color, x_lim, y_lim, overlay, show_home_marker):
+    layers = plot_layers(points_with_color, x_lim, y_lim)
+
+    start_lon, start_lat, _ = points_with_color[0]
+    start_px, start_py = project(start_lon, start_lat, x_lim, y_lim, ROUTE_WIDTH, ROUTE_HEIGHT)
+
+    route_children = layers + [
+        render.Padding(
+            pad = (max(0, start_px - 1), max(0, start_py - 1), 0, 0),
+            child = render.Circle(color = COLOR_START, diameter = 3),
+        ),
+    ]
+
+    if show_home_marker:
+        end_lon, end_lat, _ = points_with_color[-1]
+        end_px, end_py = project(end_lon, end_lat, x_lim, y_lim, ROUTE_WIDTH, ROUTE_HEIGHT)
+        route_children.append(
+            render.Padding(
+                pad = (max(0, end_px - 1), max(0, end_py - 1), 0, 0),
+                child = render.Circle(color = COLOR_HOME, diameter = 3),
+            ),
+        )
+
+    return render.Stack(
+        children = [
+            render.Box(color = BG_COLOR),
+            render.Padding(
+                pad = (MAP_MARGIN_LEFT, MAP_MARGIN_TOP, MAP_MARGIN_RIGHT, MAP_MARGIN_BOTTOM),
+                child = render.Stack(children = route_children),
+            ),
+            overlay,
+        ],
+    )
+
+def plot_layers(points_with_color, x_lim, y_lim):
+    """Groups consecutive same-colored points into Plot line segments,
+    sharing a boundary point between runs so the polyline stays connected."""
+    layers = []
+    current_color = None
+    current_pts = []
+
+    for lon, lat, color in points_with_color:
+        if color != current_color and len(current_pts) > 0:
+            current_pts.append((lon, lat))
+            layers.append(make_plot(current_pts, current_color, x_lim, y_lim))
+            current_pts = [(lon, lat)]
+        else:
+            current_pts.append((lon, lat))
+        current_color = color
+
+    if len(current_pts) > 1:
+        layers.append(make_plot(current_pts, current_color, x_lim, y_lim))
+    elif len(current_pts) == 1:
+        layers.append(render.Plot(
+            data = current_pts * 2,
+            width = ROUTE_WIDTH,
+            height = ROUTE_HEIGHT,
+            color = current_color,
+            x_lim = x_lim,
+            y_lim = y_lim,
+            chart_type = "scatter",
+        ))
+
+    return layers
+
+def make_plot(pts, color, x_lim, y_lim):
+    return render.Plot(
+        data = pts,
+        width = ROUTE_WIDTH,
+        height = ROUTE_HEIGHT,
+        color = color,
+        x_lim = x_lim,
+        y_lim = y_lim,
+        chart_type = "line",
+    )
+
+def project(lon, lat, x_lim, y_lim, w, h):
+    nx = (lon - x_lim[0]) / (x_lim[1] - x_lim[0])
+    ny = (lat - y_lim[0]) / (y_lim[1] - y_lim[0])
+    px = int(math.round(nx * (w - 1)))
+    py = h - 1 - int(math.round(ny * (h - 1)))
+    return px, py
+
+def bounding_box(points):
+    lons = [p[0] for p in points]
+    lats = [p[1] for p in points]
+    min_lon, max_lon = min(lons), max(lons)
+    min_lat, max_lat = min(lats), max(lats)
+
+    lon_pad = max((max_lon - min_lon) * 0.1, 0.001)
+    lat_pad = max((max_lat - min_lat) * 0.1, 0.001)
+
+    return (min_lon - lon_pad, max_lon + lon_pad), (min_lat - lat_pad, max_lat + lat_pad)
+
+def downsample(points, max_points):
+    n = len(points)
+    if n <= max_points:
+        return points
+
+    stride = float(n) / float(max_points)
+    out = []
+    for k in range(max_points - 1):
+        idx = int(k * stride)
+        if idx < n:
+            out.append(points[idx])
+    out.append(points[-1])
+    return out
+
+def colorize_points(points, sections):
+    n = len(points)
+    colors = [COLOR_GREEN] * n
+
+    for s in sections:
+        if s.get("sectionType") != "TRAFFIC":
+            continue
+        mag = s.get("magnitudeOfDelay", 0)
+        if mag >= 3:
+            color = COLOR_RED
+        elif mag == 2:
+            color = COLOR_YELLOW
+        else:
+            continue
+
+        start = s.get("startPointIndex", 0)
+        end = s.get("endPointIndex", 0)
+        for i in range(start, end + 1):
+            if i < n:
+                colors[i] = color
+
+    return [(points[i][0], points[i][1], colors[i]) for i in range(n)]
 
 def get_route(origin_loc, home_loc, api_key):
     url = "https://api.tomtom.com/routing/1/calculateRoute/%s,%s:%s,%s/json" % (
@@ -121,6 +279,7 @@ def get_route(origin_loc, home_loc, api_key):
             "key": api_key,
             "traffic": "true",
             "computeTravelTimeFor": "all",
+            "sectionType": "traffic",
         },
         ttl_seconds = CACHE_TTL_SECONDS,
     )
@@ -132,10 +291,19 @@ def get_route(origin_loc, home_loc, api_key):
     if len(routes) == 0:
         return None
 
-    summary = routes[0]["summary"]
+    r = routes[0]
+    summary = r["summary"]
+
+    points = []
+    for leg in r.get("legs", []):
+        for p in leg.get("points", []):
+            points.append((p["longitude"], p["latitude"]))
+
     return {
         "travel_time_s": summary["travelTimeInSeconds"],
         "delay_s": summary.get("trafficDelayInSeconds", 0),
+        "points": points,
+        "sections": r.get("sections", []),
     }
 
 def error_root(msg):
