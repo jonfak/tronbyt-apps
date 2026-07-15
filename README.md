@@ -19,6 +19,42 @@ No apps yet — an Outlook calendar app was attempted but dropped because the
 org's Microsoft 365 tenant locks down both public ICS calendar publishing and
 external app logins (OAuth), leaving no viable way to pull calendar data.
 
+### `apps/weather_forecast`
+
+Shows today's weather full-screen (current temp, icon, high/low), then
+slides into a 3-up view with today plus the next two days side by side,
+using the free [Open-Meteo API](https://open-meteo.com/en/docs) — no API
+key required.
+
+**Render locally:**
+
+```sh
+pixlet render apps/weather_forecast/weather_forecast.star \
+  location='{"lat":"40.7128","lng":"-74.0060","description":"New York, NY"}' \
+  -o preview.webp
+```
+
+**Push to your device:**
+
+```sh
+pixlet push <device-id> apps/weather_forecast/weather_forecast.star \
+  location='{"lat":"40.7128","lng":"-74.0060","description":"New York, NY"}'
+```
+
+**Config fields:**
+
+| field      | description                                  | default        |
+|------------|-----------------------------------------------|----------------|
+| `location` | Where to fetch the forecast for (address search) | *(required)* |
+| `units`    | `fahrenheit` or `celsius`                      | `fahrenheit`   |
+
+**Notes / limitations:**
+
+- Forecast data is cached for 30 minutes (`ttl_seconds`).
+- Weather icons are small pre-rendered PNGs embedded as base64 in the app,
+  covering the WMO weather code groups Open-Meteo returns (clear, partly
+  cloudy, cloudy, fog, rain, snow, thunderstorm).
+
 ### `apps/traffic_home`
 
 Animates the route from a starting point to home being "driven," colored
