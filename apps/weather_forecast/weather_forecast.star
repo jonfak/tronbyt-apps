@@ -271,8 +271,8 @@ def get_forecast(lat, lng, units):
     res = http.get(
         "https://api.open-meteo.com/v1/forecast",
         params = {
-            "latitude": lat,
-            "longitude": lng,
+            "latitude": str(lat),
+            "longitude": str(lng),
             "current": "temperature_2m,weather_code",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min",
             "temperature_unit": units,

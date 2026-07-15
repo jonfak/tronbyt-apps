@@ -257,8 +257,8 @@ def colorize_points(points, sections):
         else:
             continue
 
-        start = s.get("startPointIndex", 0)
-        end = s.get("endPointIndex", 0)
+        start = int(s.get("startPointIndex", 0))
+        end = int(s.get("endPointIndex", 0))
         for i in range(start, end + 1):
             if i < n:
                 colors[i] = color
