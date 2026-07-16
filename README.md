@@ -69,23 +69,31 @@ pixlet push <device-id> apps/traffic_home/traffic_home.star \
 
 ### `apps/ai_usage`
 
-Shows session usage remaining for three AI accounts (Claude personal, Claude
-work, Gemini) as three colored bars, each with a percentage and reset time.
+Shows session usage remaining for several AI accounts (e.g. two Claude accounts
++ a work ChatGPT/Codex account) as compact color-coded bars, each with a
+percentage and reset time.
 
-There's no official API for consumer chat quotas (the claude.ai / Gemini app
-"messages remaining, resets at X:XX" indicator) — only API billing usage is
-exposed via official APIs, and that's a separate thing from the chat app's
-session limit. So the values are entered manually: check each account's
-usage indicator occasionally (claude.ai: Settings > Usage) and update this
-app's config.
+The numbers are fetched automatically, the same way the community menu-bar apps
+(ClaudeBar, CodexBar) do it: a small companion **helper** service reuses the
+OAuth login from the official `claude` / `codex` CLIs, keeps the tokens
+refreshed, calls each provider's private usage endpoint, and serves one
+aggregated `usage.json`. This Pixlet app just fetches that JSON and draws it —
+no tokens ever touch the display. See
+[`apps/ai_usage/helper/`](apps/ai_usage/helper/) for the service and setup.
 
-**Render locally:**
+```
+┌──────────────┐   OAuth usage    ┌─────────┐  usage.json   ┌─────────────┐
+│ helper       │◀────endpoints───▶│ Anthropic│              │ Tronbyt/    │
+│ (this repo)  │                  │ / OpenAI │◀── fetch ─────│ ai_usage app│
+└──────────────┘                                             └─────────────┘
+```
+
+**Render locally** (against a helper running on this machine):
 
 ```sh
+apps/ai_usage/helper/ai_usage_helper.py serve &   # serves :8080/usage.json
 pixlet render apps/ai_usage/ai_usage.star \
-  claude_personal_pct="72" claude_personal_reset="15:15" \
-  claude_work_pct="40" claude_work_reset="18:00" \
-  gemini_pct="12" gemini_reset="20:30" \
+  usage_url="http://127.0.0.1:8080/usage.json" \
   -o preview.webp
 ```
 
@@ -93,26 +101,23 @@ pixlet render apps/ai_usage/ai_usage.star \
 
 ```sh
 pixlet push <device-id> apps/ai_usage/ai_usage.star \
-  claude_personal_pct="72" claude_personal_reset="15:15" \
-  claude_work_pct="40" claude_work_reset="18:00" \
-  gemini_pct="12" gemini_reset="20:30"
+  usage_url="http://<helper-host>:8080/usage.json"
 ```
 
 **Config fields:**
 
-| field                    | description                              | default |
-|--------------------------|-------------------------------------------|---------|
-| `claude_personal_pct`    | % remaining, Claude personal account       | `100`   |
-| `claude_personal_reset`  | Reset time, e.g. `15:15`                   | `--:--` |
-| `claude_work_pct`        | % remaining, Claude work account           | `100`   |
-| `claude_work_reset`      | Reset time, e.g. `15:15`                   | `--:--` |
-| `gemini_pct`             | % remaining, Gemini account                | `100`   |
-| `gemini_reset`           | Reset time, e.g. `15:15`                   | `--:--` |
+| field       | description                                    | default                          |
+|-------------|------------------------------------------------|----------------------------------|
+| `usage_url` | URL of the helper's aggregated JSON endpoint   | `http://localhost:8080/usage.json` |
+| `timezone`  | IANA timezone for reset times                  | `America/New_York`               |
 
 **Notes / limitations:**
 
-- Values are manual — there's no automated refresh.
-- Bar color: green (>50%), yellow (21-50%), red (<=20%).
+- Bar fill uses each account's color; it flips to amber below 25% and red
+  below 10% remaining.
+- The provider usage endpoints are private/undocumented and can change — see
+  the helper README for how to re-check them.
+- Gemini isn't supported: its consumer app has no comparable usage endpoint.
 
 ## Adding a new app
 

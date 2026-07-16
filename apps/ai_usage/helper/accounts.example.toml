@@ -1,0 +1,30 @@
+# Copy this file to accounts.toml and edit it.
+#
+# Each [[accounts]] entry is one login the display will show. The `id` is the
+# name you pass to `import` and the slot the credentials are stored under. The
+# `provider` decides which CLI login / usage endpoint is used ("claude" or
+# "codex"). `label` is what shows on the Tronbyt (keep it short — ~3-4 chars
+# fits the 64px display best). `color` is optional; it defaults per provider.
+
+[server]
+host = "127.0.0.1"   # use 0.0.0.0 if the Tronbyt server is a different host
+port = 8080
+cache_seconds = 60   # how long to reuse a fetched result before re-polling
+
+[[accounts]]
+id = "claude_personal"
+provider = "claude"
+label = "C-P"
+color = "#d97757"
+
+[[accounts]]
+id = "claude_work"
+provider = "claude"
+label = "C-W"
+color = "#5b8def"
+
+[[accounts]]
+id = "codex_work"
+provider = "codex"
+label = "CDX"
+color = "#19c37d"
